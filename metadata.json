@@ -1,0 +1,7 @@
+{
+  "name": "Remix: Hagat - حاجات",
+  "description": "تطبيق شامل للخدمات، التجارة، المطاعم، التوصيل، وإدارة ديلز مع نظام تواصل ذكي.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

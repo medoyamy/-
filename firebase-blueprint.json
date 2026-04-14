@@ -1,0 +1,198 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and profile details",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "mode": { "type": "string", "enum": ["user", "merchant", "provider", "driver", "deal_manager", "admin", "restaurant"] },
+        "categories": { "type": "array", "items": { "type": "string" } },
+        "location": { "type": "string" },
+        "avatar": { "type": "string" },
+        "description": { "type": "string" },
+        "isPage": { "type": "boolean" },
+        "parentId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "products": { "type": "array", "items": { "$ref": "Product" } },
+        "internalCategories": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["uid", "name", "email", "mode"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Social posts, offers, and requests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "source": { "type": "string" },
+        "budget": { "type": "string" },
+        "duration": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected", "expired"] },
+        "type": { "type": "string" },
+        "image": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "boosts": { "type": "array", "items": { "type": "string" } },
+        "likes": { "type": "array", "items": { "type": "string" } },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "userId": { "type": "string" },
+              "userName": { "type": "string" },
+              "content": { "type": "string" },
+              "createdAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
+      "required": ["authorId", "content", "status", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Items for sale in Mercato",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchantId": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "image": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "stock": { "type": "number" },
+        "status": { "type": "string", "enum": ["available", "out_of_stock", "preorder"] }
+      },
+      "required": ["merchantId", "name", "price"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "User stories and statuses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "avatar": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "time": { "type": "string" },
+        "isMine": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "avatar", "createdAt"]
+    },
+    "Chat": {
+      "title": "Chat Session",
+      "description": "A conversation between two or more users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "lastMessage": { "type": "string" },
+        "lastMessageTime": { "type": "string", "format": "date-time" },
+        "unreadCount": { "type": "object", "additionalProperties": { "type": "integer" } },
+        "type": { "type": "string", "enum": ["direct", "group", "order", "deal"] },
+        "metadata": { "type": "object" }
+      },
+      "required": ["participants", "type"]
+    },
+    "Message": {
+      "title": "Chat Message",
+      "description": "A single message in a chat session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "type": { "type": "string", "enum": ["text", "image", "video", "audio", "file", "location"] },
+        "mediaUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "readBy": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["chatId", "senderId", "text", "type", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Restaurant or Mercato order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "restaurantId": { "type": "string" },
+        "restaurantName": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "preparing", "ready", "on_way", "delivered", "cancelled"] },
+        "driverId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "location": { "type": "object" }
+      },
+      "required": ["customerId", "status", "createdAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "User reviews for profiles or products",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["profile", "post", "product"] },
+        "source": { "type": "string" },
+        "rating": { "type": "number" },
+        "content": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "targetId", "rating", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Avalon posts and offers"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Mercato products"
+    },
+    "/stories/{storyId}": {
+      "schema": "Story",
+      "description": "User stories and statuses"
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Chat sessions"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a chat session"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Orders for restaurants and delivery"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "User reviews for moderation"
+    }
+  }
+}

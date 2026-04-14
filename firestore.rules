@@ -1,0 +1,204 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.authorId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.mode == 'admin') ||
+         request.auth.token.email in ["mo7amdevo@gmail.com", "mo7amedevo@gmail.com"]);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is string ? ts.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z$") : ts is timestamp;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'name', 'email', 'mode']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             data.mode in ['user', 'merchant', 'provider', 'driver', 'deal_manager', 'admin', 'restaurant'] &&
+             (!('products' in data) || data.products is list) &&
+             (!('internalCategories' in data) || data.internalCategories is list) &&
+             (!('categories' in data) || data.categories is list) &&
+             (!('isPage' in data) || data.isPage is bool) &&
+             (!('parentId' in data) || data.parentId is string) &&
+             (!('createdAt' in data) || isValidTimestamp(data.createdAt)) &&
+             (!('avatar' in data) || data.avatar is string) &&
+             (!('description' in data) || data.description is string) &&
+             (!('location' in data) || data.location is string);
+    }
+
+    function isValidPost(data) {
+      return hasRequiredFields(['authorId', 'content', 'status', 'createdAt']) &&
+             data.authorId is string &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 5000 &&
+             data.status in ['pending', 'active', 'rejected', 'expired'] &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidProduct(data) {
+      return hasRequiredFields(['merchantId', 'name', 'price']) &&
+             data.merchantId is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.price is number && data.price >= 0;
+    }
+
+    function isValidStory(data) {
+      return hasRequiredFields(['userId', 'userName', 'avatar', 'createdAt']) &&
+             data.userId is string &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() < 100 &&
+             data.avatar is string &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidChat(data) {
+      return hasRequiredFields(['participants', 'type']) &&
+             data.participants is list && data.participants.size() >= 2 &&
+             data.type in ['direct', 'group', 'order', 'deal'] &&
+             request.auth.uid in data.participants;
+    }
+
+    function isValidMessage(data) {
+      return hasRequiredFields(['chatId', 'senderId', 'text', 'type', 'createdAt']) &&
+             data.chatId is string &&
+             data.senderId == request.auth.uid &&
+             data.text is string && data.text.size() > 0 &&
+             data.type in ['text', 'image', 'video', 'audio', 'file', 'location'] &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidOrder(data) {
+      return hasRequiredFields(['customerId', 'status', 'createdAt']) &&
+             data.customerId is string &&
+             data.status in ['pending', 'accepted', 'preparing', 'ready', 'on_way', 'delivered', 'cancelled', 'جاري التوصيل'] &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidReview(data) {
+      return hasRequiredFields(['userId', 'targetId', 'rating', 'status', 'createdAt', 'source']) &&
+             data.userId is string &&
+             data.targetId is string &&
+             data.source is string &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.status in ['pending', 'active', 'rejected'] &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    // Settings
+    match /settings/{settingId} {
+      allow read: if true; // Publicly readable for app configuration
+      allow write: if isAdmin(); // Only admins can modify app structure/settings
+    }
+
+    // Orders
+    match /orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow update: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Driver Locations
+    match /driver_locations/{orderId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // User profiles
+    match /users/{userId} {
+      // 1. Owner and Admin: Full read access
+      // We check both the document ID (userId) and the 'uid' field to support sub-profiles with random IDs
+      allow read: if isAdmin() || 
+                    (isAuthenticated() && (request.auth.uid == userId || resource.data.uid == request.auth.uid)) ||
+                    (resource.data.isPage == true && resource.data.status == 'active');
+
+      allow create: if isAuthenticated() && (request.auth.uid == userId || request.auth.uid == request.resource.data.uid) && isValidUser(request.resource.data) && 
+                    (request.resource.data.mode != 'admin' || isAdmin());
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.uid || isAdmin()) && isValidUser(request.resource.data) &&
+                    (request.resource.data.mode == resource.data.mode || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Posts
+    match /posts/{postId} {
+      allow read: if resource.data.status == 'active' || isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.authorId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.authorId && isValidPost(request.resource.data);
+      allow update: if (isDocOwner() || isAdmin()) && isValidPost(request.resource.data);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    // Products
+    match /products/{productId} {
+      allow read: if true; // Publicly readable
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.merchantId && isValidProduct(request.resource.data);
+      allow update: if (isAuthenticated() && request.auth.uid == resource.data.merchantId || isAdmin()) && isValidProduct(request.resource.data);
+      allow delete: if (isAuthenticated() && request.auth.uid == resource.data.merchantId) || isAdmin();
+    }
+
+    // Stories
+    match /stories/{storyId} {
+      allow read: if isAuthenticated(); // Friends/Users can see stories
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.userId || request.resource.data.userId == 'me') && isValidStory(request.resource.data);
+      allow update: if (isAuthenticated() && request.auth.uid == resource.data.userId) && isValidStory(request.resource.data);
+      allow delete: if (isAuthenticated() && request.auth.uid == resource.data.userId) || isAdmin();
+    }
+
+    // Chats
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && (request.auth.uid in resource.data.participants || isAdmin());
+      allow create: if isAuthenticated() && isValidChat(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid in resource.data.participants || isAdmin()) && isValidChat(request.resource.data);
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants || isAdmin());
+        allow create: if isAuthenticated() && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants || isAdmin()) && isValidMessage(request.resource.data);
+        allow update: if false; // Messages are immutable for now
+        allow delete: if (isAuthenticated() && request.auth.uid == resource.data.senderId) || isAdmin();
+      }
+    }
+
+    // Reviews
+    match /reviews/{reviewId} {
+      allow read: if resource.data.status == 'active' || isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidReview(request.resource.data);
+      allow update: if isAdmin() && isValidReview(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}
